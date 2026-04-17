@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createNebula }         from './nebula.js';
-import { createOrb }            from './orb.js';
+import { createPlanets }        from './planets.js';
 import { createParticles }      from './particles.js';
 import { createStreaks }        from './streaks.js';
 import { createSuns, updateSuns } from './suns.js';
@@ -32,8 +32,10 @@ camera.position.set(0, 3, 14);
 
 // --- Systems ---------------------------------------------------------------
 const nebula    = createNebula();
-const orb       = createOrb();
+const planets   = createPlanets();
 const particles = createParticles();
+// Drop the colored pixel-starfield — keep only the speed-dust layer.
+particles.group.remove(particles.stars.points);
 const suns      = createSuns();
 const ship      = createShip(renderer);
 const trails    = createTrails(ship, { length: 60 });
@@ -43,14 +45,12 @@ scene.add(camera);
 const streaks = createStreaks(camera);
 
 scene.add(nebula.mesh);
-scene.add(orb.group);
+scene.add(planets.group);
 scene.add(particles.group);
 scene.add(suns.group);
 scene.add(ship.group);
 scene.add(trails.group);
 
-// Position the orb as a central landmark and the ship a bit back.
-orb.group.position.set(0, 0, -30);
 ship.group.position.set(0, 0, 0);
 
 const { composer, bloom, gradePass } = createPostFX(renderer, scene, camera);
@@ -186,33 +186,13 @@ function frame() {
   // Use ship forward as the "mouse" vector to subtly warm the direction of travel.
   nebula.uniforms.uMouse.value.copy(controls.forward());
 
-  // Orb — a slowly pulsing landmark. Reactivity to proximity.
-  const distToOrb = ship.group.position.distanceTo(orb.group.position);
-  const nearOrb = THREE.MathUtils.clamp(1 - (distToOrb - 8) / 30, 0, 1);
-  const orbPulse = 0.28 + 0.22 * (0.5 + 0.5 * Math.sin(t * 0.5)) + nearOrb * 0.6;
-  orb.uniforms.uTime.value = t;
-  orb.uniforms.uProgress.value = 0.55 + nearOrb * 0.4;
-  orb.uniforms.uPulse.value = orbPulse;
-  orb.haloUniforms.uTime.value = t;
-  orb.haloUniforms.uIntensity.value = 0.9 + nearOrb * 1.1;
-  orb.filUniforms.uTime.value = t;
-  orb.filUniforms.uProgress.value = 0.6 + nearOrb * 0.4;
-  orb.filUniforms.uPulse.value = orbPulse;
-  orb.ring2Uniforms.uTime.value = t * 1.13;
-  orb.halo.lookAt(camera.position);
-  orb.group.rotation.y += dt * 0.06;
-  orb.ring.rotation.z  += dt * 0.10;
-  orb.ring2.rotation.z -= dt * 0.06;
-  // Orb breathes in scale.
-  orb.group.scale.setScalar(3.0 + Math.sin(t * 0.4) * 0.08);
+  // Planets — slow axial rotation.
+  for (const p of planets.planets) {
+    p.mesh.rotation.y += dt * p.rotationSpeed;
+  }
 
   // Nebula follows the ship (infinite-feeling skybox).
   nebula.mesh.position.copy(ship.group.position);
-
-  // Particle wrap uniforms — the vertex shader wraps each particle into a
-  // cube centered on the ship, giving an infinite starfield WITH parallax.
-  particles.stars.uniforms.uShipPos.value.copy(ship.group.position);
-  particles.stars.uniforms.uTime.value = t;
 
   particles.dust.uniforms.uShipPos.value.copy(ship.group.position);
   particles.dust.uniforms.uShipVel.value.copy(controls.velocity);
