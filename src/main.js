@@ -35,7 +35,7 @@ const nebula    = createNebula();
 const orb       = createOrb();
 const particles = createParticles();
 const suns      = createSuns();
-const ship      = createShip();
+const ship      = createShip(renderer);
 const trails    = createTrails(ship, { length: 60 });
 
 // Camera in scene graph so the streak overlay (child of camera) renders.

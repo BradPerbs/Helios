@@ -1,10 +1,14 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 // Loads the spaceship GLTF model and exposes the same public API as before
 // (group, uniforms, engineUniforms, engines, gem, exhaustPoints) so that
 // main.js, controls.js and trail.js keep working unchanged.
-export function createShip() {
+//
+// `renderer` is optional. When provided, we build a PMREM environment map so
+// the PBR materials get smooth reflections instead of chunky flat ones.
+export function createShip(renderer) {
   const group = new THREE.Group();
 
   // Stubbed uniforms kept for API compatibility with the rest of the app.
@@ -25,14 +29,25 @@ export function createShip() {
   // Local lights so the imported PBR model is visible without touching the
   // rest of the scene. They travel with the ship and don't affect the
   // scene's ShaderMaterial-based visuals.
-  const hemi = new THREE.HemisphereLight(0xbfd8ff, 0x1a1030, 1.4);
+  const hemi = new THREE.HemisphereLight(0xbfd8ff, 0x1a1030, 1.2);
   group.add(hemi);
-  const keyLight = new THREE.DirectionalLight(0xffffff, 1.6);
+  const keyLight = new THREE.DirectionalLight(0xffffff, 1.3);
   keyLight.position.set(2, 3, 2);
   group.add(keyLight);
-  const fillLight = new THREE.DirectionalLight(0x8ab4ff, 0.7);
+  const fillLight = new THREE.DirectionalLight(0x8ab4ff, 0.6);
   fillLight.position.set(-3, -1, -2);
   group.add(fillLight);
+
+  // Pre-filtered environment map for smooth PBR reflections. Without this,
+  // metallic surfaces on low-poly geometry show the raw face angles as blocky
+  // highlights. RoomEnvironment is a cheap neutral studio that gives soft,
+  // evenly distributed reflections.
+  let envMap = null;
+  if (renderer) {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+  }
 
   // A container we can transform freely while the model loads. The model is
   // parented to this so the procedural scale/center doesn't interact with
@@ -45,32 +60,54 @@ export function createShip() {
   // default white. Pull the diffuse factor straight out of the raw JSON
   // and push it into each MeshStandardMaterial after load.
   const loader = new GLTFLoader();
+  const emissiveLights = [];        // collected so we can pulse them
   loader.load(
     './src/models/spaceship/scene.gltf',
     (gltf) => {
       const model = gltf.scene;
 
-      // --- Material fix-up (spec-gloss → PBR approximation) -----------------
       const rawMaterials = (gltf.parser && gltf.parser.json && gltf.parser.json.materials) || [];
       model.traverse((obj) => {
         if (!obj.isMesh) return;
-        const raw = rawMaterials[obj.userData && obj.userData.gltfMaterialIndex] || null;
-        // Fallback: find by name.
-        const rawByName = raw || rawMaterials.find((m) => m.name === obj.material.name);
+        const rawByName = rawMaterials.find((m) => m.name === obj.material.name);
         const sg = rawByName && rawByName.extensions && rawByName.extensions.KHR_materials_pbrSpecularGlossiness;
         if (sg) {
           const [r, g, b, a] = sg.diffuseFactor || [1, 1, 1, 1];
           obj.material.color = new THREE.Color(r, g, b);
           obj.material.opacity = a;
-          obj.material.metalness = 0.4;
-          obj.material.roughness = Math.max(0, 1 - (sg.glossinessFactor || 0.5));
-          if (rawByName.emissiveFactor) {
+          obj.material.metalness = 0.35;
+          obj.material.roughness = Math.max(0.12, 1 - (sg.glossinessFactor || 0.5));
+
+          // Glass: keep it translucent but much softer so reflections don't
+          // show the underlying polygon facets.
+          if (rawByName.name === 'Glass') {
+            obj.material.roughness = 0.25;
+            obj.material.metalness = 0.1;
+            obj.material.transparent = true;
+            obj.material.opacity = 0.35;
+            obj.material.depthWrite = false;
+            obj.material.side = THREE.FrontSide;   // no inside faces showing through
+          }
+
+          // "Lights" material is the glowing back panels. Push their emissive
+          // way up so postfx bloom turns them into real light sources.
+          if (rawByName.name === 'Lights') {
+            obj.material.emissive = new THREE.Color(0x9bd8ff);  // match engine hue
+            obj.material.emissiveIntensity = 6.0;
+            obj.material.color = new THREE.Color(0xffffff);
+            obj.material.toneMapped = false;                    // let bloom blow them out
+            emissiveLights.push(obj.material);
+          } else if (rawByName.emissiveFactor) {
             obj.material.emissive = new THREE.Color(...rawByName.emissiveFactor);
           }
+
           if (rawByName.alphaMode === 'BLEND') {
             obj.material.transparent = true;
             obj.material.depthWrite = false;
           }
+
+          if (envMap) obj.material.envMap = envMap;
+          obj.material.envMapIntensity = 0.8;
           obj.material.needsUpdate = true;
         }
         obj.frustumCulled = false;
@@ -97,14 +134,13 @@ export function createShip() {
       box2.getCenter(center);
       modelHolder.position.sub(center);
 
-      // The original procedural ship's forward is -Z. Rotate so the model's
-      // nose points that way (FBX/Sketchfab exports often face +Z or +X).
-      modelHolder.rotation.y = 0;
+      modelHolder.rotation.y = Math.PI;
 
       console.log('[ship] loaded', {
         size: size.toArray(),
         scale: s,
         center: center.toArray(),
+        emissiveParts: emissiveLights.length,
       });
     },
     undefined,
@@ -119,7 +155,7 @@ export function createShip() {
     engineUniforms,
     engines: [],
     gem: null,
-    // Approximate thruster positions at the rear of the ship (trails read these).
+    emissiveLights,
     exhaustPoints: [
       new THREE.Vector3(-0.22, 0, 1.38),
       new THREE.Vector3( 0.22, 0, 1.38),
