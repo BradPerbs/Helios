@@ -3,7 +3,6 @@ import { createNebula }         from './nebula.js';
 import { createPlanets }        from './planets.js';
 import { createParticles }      from './particles.js';
 import { createStreaks }        from './streaks.js';
-import { createSuns, updateSuns } from './suns.js';
 import { createShip }           from './ship.js';
 import { createTrails }         from './trail.js';
 import { ShipControls }         from './controls.js';
@@ -36,7 +35,6 @@ const planets   = createPlanets();
 const particles = createParticles();
 // Drop the colored pixel-starfield — keep only the speed-dust layer.
 particles.group.remove(particles.stars.points);
-const suns      = createSuns();
 const ship      = createShip(renderer);
 const trails    = createTrails(ship, { length: 60 });
 
@@ -47,7 +45,6 @@ const streaks = createStreaks(camera);
 scene.add(nebula.mesh);
 scene.add(planets.group);
 scene.add(particles.group);
-scene.add(suns.group);
 scene.add(ship.group);
 scene.add(trails.group);
 
@@ -186,9 +183,10 @@ function frame() {
   // Use ship forward as the "mouse" vector to subtly warm the direction of travel.
   nebula.uniforms.uMouse.value.copy(controls.forward());
 
-  // Planets — slow axial rotation.
+  // Planets — slow axial rotation, clouds drift slightly faster.
   for (const p of planets.planets) {
     p.mesh.rotation.y += dt * p.rotationSpeed;
+    if (p.clouds) p.clouds.rotation.y += dt * p.cloudSpeed;
   }
 
   // Nebula follows the ship (infinite-feeling skybox).
@@ -197,9 +195,6 @@ function frame() {
   particles.dust.uniforms.uShipPos.value.copy(ship.group.position);
   particles.dust.uniforms.uShipVel.value.copy(controls.velocity);
   particles.dust.uniforms.uTime.value = t;
-
-  // Suns — always visible now (revealed immediately in this mode).
-  updateSuns(suns, camera, t, 1.0);
 
   // Ship visuals.
   ship.uniforms.uTime.value = t;
