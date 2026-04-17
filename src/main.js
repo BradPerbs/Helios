@@ -137,7 +137,8 @@ function onResize() {
 window.addEventListener('resize', onResize);
 
 // --- Camera rig (third-person follow) ---------------------------------------
-const camOffset       = new THREE.Vector3(0, 1.8, 6.5);   // local (behind + above)
+const camOffsetBase   = new THREE.Vector3(0, 1.8, 6.5);   // base (behind + above)
+const camOffset       = camOffsetBase.clone();            // scaled by zoom
 const camLookAhead    = new THREE.Vector3(0, 0.4, -8);    // local (in front)
 const tmpCamPos       = new THREE.Vector3();
 const tmpCamLook      = new THREE.Vector3();
@@ -153,6 +154,20 @@ const orbit = {
   pitch: Math.atan2(camOffset.y, camOffset.z),// match the follow-cam tilt
   distance: Math.hypot(camOffset.y, camOffset.z),
 };
+
+// --- Mouse-wheel zoom -------------------------------------------------------
+const ZOOM_MIN = 0.4;    // closer to the ship
+const ZOOM_MAX = 3.5;    // pulled far back
+let zoom = 1;
+const baseOrbitDistance = orbit.distance;
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  // Exponential zoom feels smooth at any distance.
+  const k = Math.exp(e.deltaY * 0.0012);
+  zoom = THREE.MathUtils.clamp(zoom * k, ZOOM_MIN, ZOOM_MAX);
+  camOffset.copy(camOffsetBase).multiplyScalar(zoom);
+  orbit.distance = baseOrbitDistance * zoom;
+}, { passive: false });
 
 canvas.addEventListener('mousedown', (e) => {
   if (e.button !== 1) return;                 // middle button only
