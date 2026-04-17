@@ -3,6 +3,8 @@ import { createNebula }         from './nebula.js';
 import { createPlanets }        from './planets.js';
 import { createParticles }      from './particles.js';
 import { createStreaks }        from './streaks.js';
+import { createAsteroids }      from './asteroids.js';
+import { createPhoenix }        from './phoenix.js';
 import { createShip }           from './ship.js';
 import { createTrails }         from './trail.js';
 import { ShipControls }         from './controls.js';
@@ -24,7 +26,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.72;    // much darker baseline
-renderer.setClearColor(0x010104, 1);
+renderer.setClearColor(0x000000, 1);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 2000);
@@ -34,8 +36,9 @@ camera.position.set(0, 3, 14);
 const nebula    = createNebula();
 const planets   = createPlanets();
 const particles = createParticles();
-// Drop the colored pixel-starfield — keep only the speed-dust layer.
-particles.group.remove(particles.stars.points);
+// Keep the pixel-starfield — it's what sells "deep space" when standing still.
+const asteroids = createAsteroids({ count: 110, extent: 1800, minR: 2.0, maxR: 22.0 });
+const phoenix   = createPhoenix({ renderer });
 const ship      = createShip(renderer);
 const trails    = createTrails(ship, { length: 60 });
 
@@ -45,6 +48,8 @@ const streaks = createStreaks(camera);
 
 scene.add(nebula.mesh);
 scene.add(planets.group);
+scene.add(phoenix.group);
+scene.add(asteroids.group);
 scene.add(particles.group);
 scene.add(ship.group);
 scene.add(trails.group);
@@ -258,11 +263,11 @@ function frame() {
   // Use ship forward as the "mouse" vector to subtly warm the direction of travel.
   nebula.uniforms.uMouse.value.copy(controls.forward());
 
-  // Planets — slow axial rotation, clouds drift slightly faster.
-  for (const p of planets.planets) {
-    p.mesh.rotation.y += dt * p.rotationSpeed;
-    if (p.clouds) p.clouds.rotation.y += dt * p.cloudSpeed;
-  }
+  // Phoenix — slow, ponderous spin.
+  phoenix.update(dt);
+
+  // Asteroids — per-instance spin.
+  asteroids.update(dt);
 
   // Nebula follows the ship (infinite-feeling skybox).
   nebula.mesh.position.copy(ship.group.position);

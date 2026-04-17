@@ -11,10 +11,10 @@ export function createNebula() {
     uTime:      { value: 0 },
     uProgress:  { value: 0 },
     uIntensity: { value: 0 },
-    uColorA:    { value: new THREE.Color('#02030a') },  // near-black base
-    uColorB:    { value: new THREE.Color('#25103e') },  // dark violet wisp
-    uColorC:    { value: new THREE.Color('#3d6a9a') },  // muted cyan accent
-    uColorD:    { value: new THREE.Color('#3a2a18') },  // dim gold
+    uColorA:    { value: new THREE.Color('#000000') },  // pure black base
+    uColorB:    { value: new THREE.Color('#1a1a1a') },  // dark grey wisp
+    uColorC:    { value: new THREE.Color('#2a2a2a') },  // neutral grey accent
+    uColorD:    { value: new THREE.Color('#2a2218') },  // dim warm grey (kept as a faint highlight)
     uMouse:     { value: new THREE.Vector3(0, 0, -1) },
   };
 

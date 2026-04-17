@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { buildSpaceEnvMap } from './envmap.js';
 
 // Loads the spaceship GLTF model and exposes the same public API as before
 // (group, uniforms, engineUniforms, engines, gem, exhaustPoints) so that
@@ -38,16 +38,11 @@ export function createShip(renderer) {
   fillLight.position.set(-3, -1, -2);
   group.add(fillLight);
 
-  // Pre-filtered environment map for smooth PBR reflections. Without this,
-  // metallic surfaces on low-poly geometry show the raw face angles as blocky
-  // highlights. RoomEnvironment is a cheap neutral studio that gives soft,
-  // evenly distributed reflections.
+  // Procedural space-matched environment map: dark void + warm sun + cool
+  // rim + faint Phoenix glow from below. This replaces RoomEnvironment,
+  // whose bright studio reflections made the hull look like a tabletop toy.
   let envMap = null;
-  if (renderer) {
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    pmrem.dispose();
-  }
+  if (renderer) envMap = buildSpaceEnvMap(renderer);
 
   // A container we can transform freely while the model loads. The model is
   // parented to this so the procedural scale/center doesn't interact with
@@ -75,8 +70,11 @@ export function createShip(renderer) {
           const [r, g, b, a] = sg.diffuseFactor || [1, 1, 1, 1];
           obj.material.color = new THREE.Color(r, g, b);
           obj.material.opacity = a;
-          obj.material.metalness = 0.35;
-          obj.material.roughness = Math.max(0.12, 1 - (sg.glossinessFactor || 0.5));
+          // Lower metalness + higher roughness floor so reflections are
+          // broad, soft, and match the dim space envmap. Sharp mirrored
+          // highlights on low-poly geometry amplify the facets.
+          obj.material.metalness = 0.22;
+          obj.material.roughness = Math.max(0.32, 1 - (sg.glossinessFactor || 0.5));
 
           // Glass: keep it translucent but much softer so reflections don't
           // show the underlying polygon facets.
@@ -107,7 +105,9 @@ export function createShip(renderer) {
           }
 
           if (envMap) obj.material.envMap = envMap;
-          obj.material.envMapIntensity = 0.8;
+          // Dim-space env, so we can push intensity up without the reflections
+          // becoming too bright. Gives the hull shape from IBL alone.
+          obj.material.envMapIntensity = 1.35;
           obj.material.needsUpdate = true;
         }
         obj.frustumCulled = false;
