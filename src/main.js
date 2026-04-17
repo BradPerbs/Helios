@@ -8,6 +8,7 @@ import { createTrails }         from './trail.js';
 import { ShipControls }         from './controls.js';
 import { createPostFX }         from './postfx.js';
 import { CosmicAudio }          from './audio.js';
+import { EngineAudio }          from './engineAudio.js';
 
 // --- Bootstrap --------------------------------------------------------------
 const canvas = document.getElementById('stage');
@@ -52,10 +53,16 @@ ship.group.position.set(0, 0, 0);
 
 const { composer, bloom, gradePass } = createPostFX(renderer, scene, camera);
 const audio = new CosmicAudio({ src: './Helios.mp3', volume: 0.7 });
+const engineAudio = new EngineAudio({ volume: 0.55 });
 const controls = new ShipControls({
   ship,
   canvas,
-  onBoostChange: (b) => { if (b) audio.duck(); },
+  onBoostChange: (b) => {
+    if (b) {
+      audio.duck();
+      engineAudio.boostAttack();
+    }
+  },
 });
 
 // --- UI refs ----------------------------------------------------------------
@@ -86,6 +93,7 @@ let ready = false;
 
 enterBtn.addEventListener('click', async () => {
   const result = await audio.start();
+  engineAudio.start();
   if (!result.ok) {
     audioWarnEl.classList.add('show');
     setTimeout(() => audioWarnEl.classList.remove('show'), 9000);
@@ -104,6 +112,7 @@ enterBtn.addEventListener('click', async () => {
 muteBtn.addEventListener('click', () => {
   const m = !audio.muted;
   audio.setMuted(m);
+  engineAudio.setMuted(m);
   muteBtn.textContent = m ? 'Sound · Off' : 'Sound · On';
   muteBtn.setAttribute('aria-pressed', m ? 'true' : 'false');
 });
@@ -132,8 +141,43 @@ const camOffset       = new THREE.Vector3(0, 1.8, 6.5);   // local (behind + abo
 const camLookAhead    = new THREE.Vector3(0, 0.4, -8);    // local (in front)
 const tmpCamPos       = new THREE.Vector3();
 const tmpCamLook      = new THREE.Vector3();
+const camLookCurrent  = new THREE.Vector3();               // smoothed lookAt target
+let camLookInit       = false;
 const tmpMouseWorld   = new THREE.Vector3();
 const ndc             = new THREE.Vector3();
+
+// --- Orbit camera (middle-mouse hold to inspect the ship) -------------------
+const orbit = {
+  active: false,
+  yaw: 0,                                     // radians around ship-Y
+  pitch: Math.atan2(camOffset.y, camOffset.z),// match the follow-cam tilt
+  distance: Math.hypot(camOffset.y, camOffset.z),
+};
+
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button !== 1) return;                 // middle button only
+  e.preventDefault();
+  orbit.active = true;
+  controls.aimEnabled = false;                // don't steer while inspecting
+  orbit.yaw = 0;
+  orbit.pitch = Math.atan2(camOffset.y, camOffset.z);
+});
+canvas.addEventListener('mouseup', (e) => {
+  if (e.button !== 1) return;
+  orbit.active = false;
+  controls.aimEnabled = true;
+});
+canvas.addEventListener('auxclick', (e) => {
+  if (e.button === 1) e.preventDefault();     // stop browser autoscroll
+});
+document.addEventListener('mousemove', (e) => {
+  if (!orbit.active) return;
+  orbit.yaw   -= (e.movementX || 0) * 0.004;
+  orbit.pitch = THREE.MathUtils.clamp(
+    orbit.pitch - (e.movementY || 0) * 0.004,
+    -1.3, 1.3,
+  );
+});
 
 // --- Animation loop --------------------------------------------------------
 const clock = new THREE.Clock();
@@ -153,24 +197,40 @@ function frame() {
   const throttle = controls.throttle;
   const boosting = controls.boosting;
 
-  // --- Camera follow -------------------------------------------------------
-  // Compute desired camera position in ship's local frame, then to world.
-  tmpCamPos.copy(camOffset);
-  ship.group.localToWorld(tmpCamPos);
-  tmpCamLook.copy(camLookAhead);
-  ship.group.localToWorld(tmpCamLook);
+  // --- Camera follow / orbit ----------------------------------------------
+  if (orbit.active) {
+    // Spherical offset in ship-local space, so orbit sticks to the ship.
+    const d  = orbit.distance;
+    const cp = Math.cos(orbit.pitch);
+    tmpCamPos.set(
+      d * cp * Math.sin(orbit.yaw),
+      d * Math.sin(orbit.pitch),
+      d * cp * Math.cos(orbit.yaw),
+    );
+    ship.group.localToWorld(tmpCamPos);
+    tmpCamLook.copy(ship.group.position);     // look at ship centre
+  } else {
+    tmpCamPos.copy(camOffset);
+    ship.group.localToWorld(tmpCamPos);
+    tmpCamLook.copy(camLookAhead);
+    ship.group.localToWorld(tmpCamLook);
 
-  // Light camera shake during boost.
-  if (boosting) {
-    tmpCamPos.x += (Math.random() - 0.5) * 0.06;
-    tmpCamPos.y += (Math.random() - 0.5) * 0.06;
+    if (boosting) {
+      tmpCamPos.x += (Math.random() - 0.5) * 0.06;
+      tmpCamPos.y += (Math.random() - 0.5) * 0.06;
+    }
   }
 
-  // Smooth follow.
+  // Smooth follow (position + look target).
   const followK = 1 - Math.exp(-dt * 6);
   camera.position.lerp(tmpCamPos, followK);
-  // LookAt (computed directly each frame for stable orientation).
-  camera.lookAt(tmpCamLook);
+  if (!camLookInit) {
+    camLookCurrent.copy(tmpCamLook);
+    camLookInit = true;
+  } else {
+    camLookCurrent.lerp(tmpCamLook, followK);
+  }
+  camera.lookAt(camLookCurrent);
 
   // --- Trails --------------------------------------------------------------
   trails.update(dt, throttle);
@@ -200,6 +260,9 @@ function frame() {
   ship.uniforms.uTime.value = t;
   ship.uniforms.uThrottle.value = throttle;
   ship.engineUniforms.uTime.value = t;
+
+  // Engine sound reacts to throttle + boost.
+  engineAudio.update(dt, throttle, boosting);
 
   // --- Post FX -------------------------------------------------------------
   // Streaks: only a hint during boost — the real motion comes from dust.

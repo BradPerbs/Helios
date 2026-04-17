@@ -39,6 +39,7 @@ export class ShipControls {
     this._mouseDX = 0;
     this._mouseDY = 0;
     this._locked  = false;
+    this.aimEnabled = true;   // external code can pause mouse-aim input
 
     this._tmpQ = new THREE.Quaternion();
     this._forward = new THREE.Vector3();
@@ -69,7 +70,7 @@ export class ShipControls {
     });
 
     document.addEventListener('mousemove', (e) => {
-      if (!this._locked) return;
+      if (!this._locked || !this.aimEnabled) return;
       this._mouseDX += e.movementX || 0;
       this._mouseDY += e.movementY || 0;
     });
