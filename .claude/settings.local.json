@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://unpkg.com/three@0.160.1/examples/jsm/postprocessing/OutputPass.js\")",
+      "Bash(curl -s -o /dev/null -w \"EffectComposer:%{http_code}\\\\n\" \"https://unpkg.com/three@0.160.1/examples/jsm/postprocessing/EffectComposer.js\")",
+      "Bash(curl -s -o /dev/null -w \"UnrealBloomPass:%{http_code}\\\\n\" \"https://unpkg.com/three@0.160.1/examples/jsm/postprocessing/UnrealBloomPass.js\")",
+      "Bash(curl -s -o /dev/null -w \"ShaderPass:%{http_code}\\\\n\" \"https://unpkg.com/three@0.160.1/examples/jsm/postprocessing/ShaderPass.js\")",
+      "Bash(curl -s -o /dev/null -w \"RenderPass:%{http_code}\\\\n\" \"https://unpkg.com/three@0.160.1/examples/jsm/postprocessing/RenderPass.js\")",
+      "Bash(curl -s -o /dev/null -w \"three:%{http_code}\\\\n\" \"https://unpkg.com/three@0.160.1/build/three.module.js\")",
+      "Bash(node --check \"c:/Users/bradp/Desktop/3JS/src/audio.js\")",
+      "Bash(node --check \"c:/Users/bradp/Desktop/3JS/src/nebula.js\")",
+      "Bash(node --check \"c:/Users/bradp/Desktop/3JS/src/orb.js\")",
+      "Bash(node --check \"c:/Users/bradp/Desktop/3JS/src/particles.js\")",
+      "Bash(node --check \"c:/Users/bradp/Desktop/3JS/src/postfx.js\")",
+      "Bash(node --check \"c:/Users/bradp/Desktop/3JS/src/main.js\")"
+    ]
+  }
+}

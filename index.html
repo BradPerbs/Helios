@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <title>Helios — The Cosmic Stage</title>
+  <link rel="icon" href="data:," />
+  <style>
+    :root {
+      --fg: #e9e6ff;
+      --dim: #9a97c7;
+      --accent: #7de3ff;
+      --magenta: #ff7adf;
+      --gold: #f5d8a8;
+      --panel: rgba(8, 8, 20, 0.42);
+      --border: rgba(255,255,255,.12);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #05050a;
+      color: var(--fg);
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    canvas { display: block; }
+    button { font-family: inherit; }
+
+    /* ---------- Loader / entry veil ---------- */
+    #veil {
+      position: fixed; inset: 0; z-index: 20;
+      display: grid; place-items: center;
+      background: radial-gradient(ellipse at center, #0a0a18 0%, #030307 70%);
+      transition: opacity 1.6s ease;
+      font-family: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+    }
+    #veil.gone { opacity: 0; pointer-events: none; }
+    #veil .frame {
+      text-align: center;
+      transform: translateY(-4vh);
+      letter-spacing: .3em;
+      animation: breathe 6s ease-in-out infinite;
+      max-width: 520px;
+      padding: 0 20px;
+    }
+    #veil h1 {
+      font-weight: 300;
+      font-size: clamp(24px, 3vw, 42px);
+      margin: 0 0 14px;
+      letter-spacing: .6em;
+      color: var(--fg);
+      text-transform: uppercase;
+      opacity: .92;
+    }
+    #veil .sub {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 300;
+      font-size: 11px;
+      letter-spacing: .5em;
+      color: var(--dim);
+      text-transform: uppercase;
+    }
+    #veil .cta {
+      margin-top: 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      align-items: center;
+    }
+    #veil .enter {
+      display: inline-block;
+      padding: 14px 38px;
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: 999px;
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      letter-spacing: .45em;
+      text-transform: uppercase;
+      color: var(--fg);
+      cursor: pointer;
+      background: transparent;
+      transition: background .6s ease, border-color .6s ease, letter-spacing .6s ease, opacity .6s ease;
+    }
+    #veil .enter:disabled { opacity: .25; cursor: default; }
+    #veil .enter:not(:disabled):hover {
+      background: rgba(125, 227, 255, .07);
+      border-color: rgba(125, 227, 255, .45);
+      letter-spacing: .55em;
+    }
+    #veil .hint {
+      font-family: 'Inter', sans-serif;
+      font-size: 10px;
+      letter-spacing: .35em;
+      text-transform: uppercase;
+      color: var(--dim);
+      opacity: .7;
+    }
+    #veil .progress {
+      margin-top: 22px;
+      width: 180px;
+      height: 1px;
+      background: rgba(255,255,255,.08);
+      position: relative;
+      overflow: hidden;
+    }
+    #veil .progress > span {
+      position: absolute; left: 0; top: 0; height: 100%; width: 0%;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      transition: width .8s ease;
+    }
+
+    /* ---------- HUD ---------- */
+    #hud {
+      position: fixed; inset: 0; z-index: 6;
+      pointer-events: none;
+      color: var(--dim);
+      opacity: 0;
+      transition: opacity 1.4s ease;
+    }
+    #hud.ready { opacity: 1; }
+    #hud .corner { position: absolute; padding: 22px 24px; }
+    #hud .tl { top: 0; left: 0; }
+    #hud .tr { top: 0; right: 0; text-align: right; pointer-events: auto; }
+    #hud .bl { bottom: 0; left: 0; }
+    #hud .br { bottom: 0; right: 0; text-align: right; }
+
+    #hud .brand {
+      letter-spacing: .35em;
+      text-transform: uppercase;
+      font-size: 10px;
+    }
+    #hud .brand .dot {
+      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent); margin-right: 10px;
+      box-shadow: 0 0 10px var(--accent);
+      animation: blink 3.4s ease-in-out infinite;
+      vertical-align: 1px;
+    }
+    #hud .brand b {
+      display: block;
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-weight: 400;
+      font-size: 15px;
+      letter-spacing: .18em;
+      text-transform: none;
+      color: var(--fg);
+      margin-top: 4px;
+    }
+
+    /* Controls card */
+    #controls-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      min-width: 220px;
+    }
+    #controls-card .title {
+      font-size: 9px;
+      letter-spacing: .5em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+    #controls-card .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 6px 0;
+      font-size: 11px;
+      letter-spacing: .02em;
+      color: var(--dim);
+    }
+    #controls-card .keys { display: inline-flex; gap: 4px; }
+    #controls-card .k {
+      display: inline-block;
+      min-width: 22px;
+      padding: 3px 7px;
+      font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+      font-size: 10px;
+      color: var(--fg);
+      text-align: center;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 4px;
+      background: rgba(255,255,255,.03);
+      box-shadow: inset 0 -1px 0 rgba(255,255,255,.06);
+    }
+    #controls-card .row .label { letter-spacing: .04em; }
+
+    /* Speed gauge */
+    #speed {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      min-width: 240px;
+    }
+    #speed .head {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 10px;
+    }
+    #speed .label {
+      font-size: 9px;
+      letter-spacing: .5em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    #speed .value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 24px;
+      font-weight: 300;
+      color: var(--fg);
+      letter-spacing: .05em;
+    }
+    #speed .unit { font-size: 9px; color: var(--dim); letter-spacing: .3em; margin-left: 4px; }
+    #speed .bar {
+      position: relative;
+      height: 2px;
+      background: rgba(255,255,255,.08);
+      border-radius: 1px;
+      overflow: hidden;
+    }
+    #speed .fill {
+      position: absolute; left: 0; top: 0; height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--magenta));
+      box-shadow: 0 0 10px var(--accent);
+      transition: width .12s linear;
+    }
+
+    /* Status line */
+    #status {
+      margin-top: 10px;
+      font-size: 10px;
+      letter-spacing: .25em;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+
+    /* Mute button */
+    #mute-btn {
+      cursor: pointer; padding: 8px 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 999px;
+      color: var(--fg); background: transparent;
+      letter-spacing: .35em; text-transform: uppercase; font-size: 9px;
+      transition: border-color .6s ease, color .6s ease;
+    }
+    #mute-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Audio warning */
+    #audio-warn {
+      position: fixed; top: 80px; left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      z-index: 12;
+      padding: 12px 20px;
+      background: rgba(40, 10, 18, 0.75);
+      border: 1px solid rgba(255, 122, 223, .4);
+      border-radius: 10px;
+      color: var(--fg);
+      font-size: 11px;
+      letter-spacing: .04em;
+      max-width: 420px;
+      line-height: 1.5;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .6s ease, transform .6s ease;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    #audio-warn.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    #audio-warn code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      background: rgba(255,255,255,.06);
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: var(--gold);
+    }
+
+    /* Crosshair */
+    #crosshair {
+      position: fixed; left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 8;
+      width: 22px; height: 22px;
+      opacity: 0;
+      transition: opacity .8s ease;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+    #crosshair.ready { opacity: .85; }
+    body.locked #crosshair { opacity: 1; }
+    #crosshair::before,
+    #crosshair::after {
+      content: '';
+      position: absolute;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+    #crosshair::before { left: 50%; top: 0; bottom: 0; width: 1px; transform: translateX(-50%); }
+    #crosshair::after  { top: 50%; left: 0; right: 0; height: 1px; transform: translateY(-50%); }
+    #crosshair i {
+      position: absolute; left: 50%; top: 50%;
+      width: 4px; height: 4px;
+      margin: -2px 0 0 -2px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+    }
+
+    @keyframes breathe {
+      0%, 100% { opacity: 1; transform: translateY(-4vh) scale(1); }
+      50%      { opacity: .85; transform: translateY(-4vh) scale(1.005); }
+    }
+    @keyframes blink {
+      0%, 100% { opacity: .35; }
+      50%      { opacity: 1; }
+    }
+
+    @media (max-width: 720px) {
+      #hud .corner { padding: 14px 16px; }
+      #controls-card { display: none; }
+      #speed { min-width: 0; padding: 10px 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="veil">
+    <div class="frame">
+      <h1>Helios</h1>
+      <div class="sub">The Cosmic Stage</div>
+      <div class="cta">
+        <button class="enter" id="enter-btn" disabled>Take the helm</button>
+        <div class="hint">WASD · Mouse · Shift to boost</div>
+      </div>
+      <div class="progress"><span id="progress-bar"></span></div>
+    </div>
+  </div>
+
+  <div id="hud">
+    <div class="corner tl">
+      <div class="brand">
+        <span class="dot"></span>Helios · Stage Open
+        <b>Free flight</b>
+      </div>
+    </div>
+
+    <div class="corner tr">
+      <button id="mute-btn" aria-pressed="false">Sound · On</button>
+    </div>
+
+    <div class="corner bl">
+      <div id="controls-card">
+        <div class="title">Flight Controls</div>
+        <div class="row"><span class="label">Thrust</span><span class="keys"><i class="k">W</i><i class="k">S</i></span></div>
+        <div class="row"><span class="label">Bank</span><span class="keys"><i class="k">A</i><i class="k">D</i></span></div>
+        <div class="row"><span class="label">Yaw</span><span class="keys"><i class="k">Q</i><i class="k">E</i></span></div>
+        <div class="row"><span class="label">Aim</span><span class="keys"><i class="k">Mouse</i></span></div>
+        <div class="row"><span class="label">Boost</span><span class="keys"><i class="k">Shift</i></span></div>
+        <div class="row"><span class="label">Brake</span><span class="keys"><i class="k">Space</i></span></div>
+      </div>
+    </div>
+
+    <div class="corner br">
+      <div id="speed">
+        <div class="head">
+          <span class="label">Velocity</span>
+          <span class="value"><span id="speed-val">000</span><span class="unit">AU/s</span></span>
+        </div>
+        <div class="bar"><div class="fill" id="speed-fill"></div></div>
+        <div id="status">Click anywhere to take the helm.</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="audio-warn">
+    Audio couldn't start. Drop <code>Helios.mp3</code> next to <code>index.html</code>
+    and serve over a local web server (not <code>file://</code>).
+  </div>
+
+  <div id="crosshair"><i></i></div>
+
+  <canvas id="stage"></canvas>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.1/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.1/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
