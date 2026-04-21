@@ -2,6 +2,8 @@
 
 A WebGL space scene you can fly through. Pilot a ship past nebulae, planets, and asteroid fields with ambient audio and a reactive engine soundtrack.
 
+![Helios preview](heliosphoto.png)
+
 **[Live demo](#)** · open `index.html` in a modern browser (or serve the folder over HTTP).
 
 ## Tech
