@@ -58,4 +58,5 @@ src/models/             GLTF assets (see per-model license.txt)
 
 ## Credits
 
-GLTF models are third-party — license terms are in each model folder under `src/models/*/license.txt`.
+- **3D models** — free assets from [Sketchfab](https://sketchfab.com). License terms are in each model folder under `src/models/*/license.txt`.
+- **Music** — *Helios the Cosmic Stage* (the project's namesake).
