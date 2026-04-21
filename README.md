@@ -1,4 +1,4 @@
-# Helios — The Cosmic Stage
+# Helios
 
 A WebGL space scene you can fly through. Pilot a ship past nebulae, planets, and asteroid fields with ambient audio and a reactive engine soundtrack.
 
