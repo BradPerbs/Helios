@@ -11,10 +11,11 @@ import * as THREE from 'three';
 // The ship has inertia. Damping is tuned for a snappy arcade feel so the
 // player doesn't drift forever when they let go of W.
 export class ShipControls {
-  constructor({ ship, canvas, onBoostChange }) {
+  constructor({ ship, canvas, onBoostChange, onHyperChange }) {
     this.ship   = ship;
     this.canvas = canvas;
     this.onBoostChange = onBoostChange || (() => {});
+    this.onHyperChange = onHyperChange || (() => {});
 
     this.velocity   = new THREE.Vector3();
     this.throttle   = 0;            // smoothed 0..1 for visuals
@@ -24,12 +25,20 @@ export class ShipControls {
 
     this.maxSpeed       = 55;
     this.boostMaxSpeed  = 140;
+    this.hyperMaxSpeed  = 260;
     this.thrustAccel    = 45;
     this.boostAccel     = 130;
+    this.hyperAccel     = 260;
     this.reverseAccel   = 20;
     this.linearDamping  = 0.985;   // per 60hz tick
     this.angularDamping = 0.88;
     this.brakeDamping   = 0.92;
+
+    // "Break the sound barrier" — charges while held at peak boost speed.
+    this.hyperCharge   = 0;         // 0..1 build-up while eligible
+    this.hyperActive   = false;
+    this.hyperChargeTime = 1.5;     // seconds of peak-boost before break
+    this.hyperDecayTime  = 0.45;    // seconds for charge to bleed off
 
     this.mouseSens = 0.0018;
     this.keyRollRate  = 2.2;   // rad/s
@@ -130,7 +139,9 @@ export class ShipControls {
     // Local forward in world space.
     this._forward.set(0, 0, -1).applyQuaternion(ship.quaternion);
 
-    const accel = this.boosting ? this.boostAccel : this.thrustAccel;
+    const accel = this.hyperActive
+      ? this.hyperAccel
+      : (this.boosting ? this.boostAccel : this.thrustAccel);
     if (keys.has('KeyW')) {
       this.velocity.addScaledVector(this._forward, accel * dt);
       this.targetThrottle = this.boosting ? 1.0 : 0.75;
@@ -151,12 +162,38 @@ export class ShipControls {
     const dampG = Math.pow(this.linearDamping, dt * 60);
     this.velocity.multiplyScalar(dampG);
 
-    // Speed cap.
-    const vmax = this.boosting ? this.boostMaxSpeed : this.maxSpeed;
+    // Speed cap. In hyper mode the barrier is lifted.
+    const vmax = this.hyperActive
+      ? this.hyperMaxSpeed
+      : (this.boosting ? this.boostMaxSpeed : this.maxSpeed);
     if (this.velocity.length() > vmax) this.velocity.setLength(vmax);
 
     // Position integration.
     ship.position.addScaledVector(this.velocity, dt);
+
+    // --- Hyper / sound-barrier break ----------------------------------------
+    // Charges while holding W+Shift at the top of the boost envelope. Once
+    // fully charged it "breaks through" and stays active until the player
+    // stops thrusting forward or releases Shift.
+    const speedNow = this.velocity.length();
+    const forwardThrust = this.boosting && keys.has('KeyW');
+    const atPeakBoost = forwardThrust &&
+      (speedNow > this.boostMaxSpeed * 0.97 || this.hyperActive);
+
+    if (atPeakBoost) {
+      this.hyperCharge = Math.min(1, this.hyperCharge + dt / this.hyperChargeTime);
+    } else {
+      this.hyperCharge = Math.max(0, this.hyperCharge - dt / this.hyperDecayTime);
+    }
+
+    const wasHyper = this.hyperActive;
+    if (!this.hyperActive && this.hyperCharge >= 1 && forwardThrust) {
+      this.hyperActive = true;
+    } else if (this.hyperActive && !forwardThrust) {
+      this.hyperActive = false;
+      this.hyperCharge = 0;
+    }
+    if (this.hyperActive !== wasHyper) this.onHyperChange(this.hyperActive);
 
     // Smooth throttle toward target so visuals don't pop.
     this.throttle += (this.targetThrottle - this.throttle) * Math.min(1, dt * 6);

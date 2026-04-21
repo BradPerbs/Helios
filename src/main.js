@@ -68,6 +68,21 @@ const controls = new ShipControls({
       engineAudio.boostAttack();
     }
   },
+  onHyperChange: (h) => {
+    if (h) {
+      audio.duck();
+      engineAudio.hyperBreak();
+      // Retrigger the shockwave CSS animation.
+      shockwaveEl.classList.remove('fire');
+      void shockwaveEl.offsetWidth;
+      shockwaveEl.classList.add('fire');
+      warpBadgeEl.classList.add('show');
+      document.body.classList.add('hyper');
+    } else {
+      warpBadgeEl.classList.remove('show');
+      document.body.classList.remove('hyper');
+    }
+  },
 });
 
 // --- UI refs ----------------------------------------------------------------
@@ -81,6 +96,8 @@ const statusEl     = document.getElementById('status');
 const muteBtn      = document.getElementById('mute-btn');
 const crosshairEl  = document.getElementById('crosshair');
 const audioWarnEl  = document.getElementById('audio-warn');
+const shockwaveEl  = document.getElementById('shockwave');
+const warpBadgeEl  = document.getElementById('warp-badge');
 
 let ready = false;
 
@@ -216,6 +233,8 @@ function frame() {
   const speed    = controls.speed();
   const throttle = controls.throttle;
   const boosting = controls.boosting;
+  const hyper    = controls.hyperActive;
+  const hyperCharge = controls.hyperCharge;
 
   // --- Camera follow / orbit ----------------------------------------------
   if (orbit.active) {
@@ -236,10 +255,18 @@ function frame() {
     ship.group.localToWorld(tmpCamLook);
 
     if (boosting) {
-      tmpCamPos.x += (Math.random() - 0.5) * 0.06;
-      tmpCamPos.y += (Math.random() - 0.5) * 0.06;
+      const shake = hyper ? 0.22 : 0.06;
+      tmpCamPos.x += (Math.random() - 0.5) * shake;
+      tmpCamPos.y += (Math.random() - 0.5) * shake;
+      if (hyper) tmpCamPos.z += (Math.random() - 0.5) * shake * 0.5;
     }
   }
+
+  // FOV punch — widens in boost, slams open in hyper for the warp-tunnel feel.
+  const baseFov = 62;
+  const targetFov = hyper ? baseFov + 18 : (boosting ? baseFov + 5 : baseFov);
+  camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 4.5);
+  camera.updateProjectionMatrix();
 
   // Smooth follow (position + look target).
   const followK = 1 - Math.exp(-dt * 6);
@@ -281,29 +308,35 @@ function frame() {
   ship.uniforms.uThrottle.value = throttle;
   ship.engineUniforms.uTime.value = t;
 
-  // Engine sound reacts to throttle + boost.
-  engineAudio.update(dt, throttle, boosting);
+  // Engine sound reacts to throttle + boost + hyper.
+  engineAudio.update(dt, throttle, boosting, hyper);
 
   // --- Post FX -------------------------------------------------------------
   // Streaks: only a hint during boost — the real motion comes from dust.
   const boostVis = boosting ? Math.min(1, throttle * 0.55) : 0;
+  const hyperVis = hyper ? 1.0 : 0;
   streaks.uniforms.uTime.value = t;
   streaks.uniforms.uIntensity.value = THREE.MathUtils.lerp(
     streaks.uniforms.uIntensity.value,
-    boostVis,
+    Math.max(boostVis, hyperVis),
     Math.min(1, dt * 5),
   );
 
   gradePass.uniforms.uTime.value = t;
-  gradePass.uniforms.uChroma.value = 0.0012 + throttle * 0.0016 + boostVis * 0.005;
+  gradePass.uniforms.uChroma.value =
+    0.0012 + throttle * 0.0016 + boostVis * 0.005 + hyperVis * 0.014;
   gradePass.uniforms.uFade.value = 1.0;
   // Bloom stays low so only bright points (orb, suns, engines) glow.
-  bloom.strength = 0.35 + throttle * 0.08 + boostVis * 0.18;
+  bloom.strength = 0.35 + throttle * 0.08 + boostVis * 0.18 + hyperVis * 0.75;
 
   // --- HUD -----------------------------------------------------------------
-  const pct = Math.min(1, speed / controls.boostMaxSpeed);
+  // Normalize against the hyper ceiling so boost reads ~55% and hyper fills.
+  const pct = Math.min(1, speed / controls.hyperMaxSpeed);
   speedFillEl.style.width = `${pct * 100}%`;
   speedValEl.textContent = `${Math.round(speed).toString().padStart(3, '0')}`;
+  // Pulse the speed bar while charging toward the break.
+  speedFillEl.style.filter =
+    hyperCharge > 0 ? `drop-shadow(0 0 ${6 + hyperCharge * 14}px rgba(255,106,61,${0.3 + hyperCharge * 0.7}))` : '';
 
   composer.render();
   requestAnimationFrame(frame);

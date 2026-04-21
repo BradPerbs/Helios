@@ -12,7 +12,14 @@
       "Bash(node --check \"c:/Users/bradp/Desktop/3JS/src/orb.js\")",
       "Bash(node --check \"c:/Users/bradp/Desktop/3JS/src/particles.js\")",
       "Bash(node --check \"c:/Users/bradp/Desktop/3JS/src/postfx.js\")",
-      "Bash(node --check \"c:/Users/bradp/Desktop/3JS/src/main.js\")"
+      "Bash(node --check \"c:/Users/bradp/Desktop/3JS/src/main.js\")",
+      "Bash(gh auth *)",
+      "Bash(git -C c:/Users/bradp/Desktop/Helios ls-files)",
+      "Bash(git -C c:/Users/bradp/Desktop/Helios diff --stat)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://api.github.com/repos/BradPerbs/Helios)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ]
   }
 }
