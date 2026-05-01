@@ -56,6 +56,10 @@ src/shaders/            GLSL for each system
 src/models/             GLTF assets (see per-model license.txt)
 ```
 
+## Sponsors
+
+[![Cloudblast.io - Cloud VM Hosting](https://cloudblast.io/_nuxt/logo-icon.DmhfkCLY.svg)](https://cloudblast.io)
+
 ## Credits
 
 - **3D models** — free assets from [Sketchfab](https://sketchfab.com). License terms are in each model folder under `src/models/*/license.txt`.
